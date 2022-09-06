@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import * as x509 from '@peculiar/x509';
 import { encode } from 'base64-arraybuffer';
 import { Certificate } from '../../../interfaces/certificate';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   addCertificate,
   setCurrentCertificate,
@@ -11,12 +11,12 @@ import {
 } from '../../../store/certificates-slice/certificates-slice';
 import { AdditionalText } from '../additional-text/additional-text';
 import { CERTIFICATE_TYPE } from '../../../const';
-// @ts-ignore
-import uniqid from 'uniqid';
 import { DropArea } from './styled';
+import { RootState } from '../../../store';
 
 function Upload() {
   const dispatch = useDispatch();
+  const certificates = useSelector((state: RootState) => state.certificates.certificates);
   const onDrop = useCallback((acceptedFiles: Blob[]) => {
     acceptedFiles.forEach((file, index, array) => {
       try {
@@ -29,6 +29,12 @@ function Upload() {
           try {
             const base64 = encode(evt.target.result);
             const parseCert = new x509.X509Certificate(base64);
+
+            for (let cert of certificates) {
+              if (cert.id === parseCert.serialNumber) {
+                throw new Error('Сертифікат уже присутній')
+              }
+            }
 
             const getProperty = (row: string): string => {
               const start = 'CN=';
@@ -46,8 +52,11 @@ function Upload() {
               issuerCN: getProperty(parseCert.issuer),
               validFrom: parseCert.notBefore,
               validTill: parseCert.notAfter,
-              id: uniqid(),
+              id: parseCert.serialNumber,
             };
+
+
+
             dispatch(addCertificate(certificate));
             if (array.length - 1 === index) {
               dispatch(setIsUploading(false));
@@ -60,7 +69,7 @@ function Upload() {
         };
         reader.readAsArrayBuffer(file);
       } catch (e) {
-        console.log(e);
+        alert(e);
       }
 
     });
